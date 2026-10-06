@@ -85,4 +85,4 @@ npm publish --registry http://localhost:4873
 
 遵循语义化版本；`0.x` 阶段也需查看 CHANGELOG，兼容修复增加 patch，破坏性变更增加 minor，并明确迁移步骤。表单 JSON 格式升级使用 `formatVersion`；新增字段类型需要消费方 UI 同步支持。所有网站锁定确切 package 版本，经升级 PR 后重新构建部署。
 
-本地仓库临时放在 template-next 的 `packages/form-core`，源码和配置自包含，可单独移动、克隆和发布。template-next 通过明确版本加 `linkWorkspacePackages` 链接匹配的本地版本，方便首次开发；独立发布后，消费项目应移除这个开发 checkout，直接从 registry 安装，避免继续维护源码副本。
+本地源码仓库独立维护在 `/Users/kasami/form-core`，源码和构建配置自包含，使用 `npm ci` 安装开发依赖。template-next 和派生项目从私有 registry 安装精确版本，不保留源码副本或链接本地 checkout。修改核心后发布新版本，再通过升级 PR 更新网站依赖。
