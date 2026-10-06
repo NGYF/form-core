@@ -1,0 +1,42 @@
+{
+  "name": "@kasami/form-core",
+  "version": "0.1.0",
+  "description": "Portable, headless JSON forms, validation and exports",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.3",
+    "eslint": "9.39.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.57.0"
+  },
+  "publishConfig": {
+    "registry": "http://localhost:4873"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NGYF/form-core.git"
+  },
+  "homepage": "https://github.com/NGYF/form-core#readme",
+  "engines": {
+    "node": ">=22"
+  }
+}
