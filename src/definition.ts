@@ -35,10 +35,10 @@ export function validateDefinition(input: unknown): { valid: boolean; issues: De
   if (!isRecord(input)) return { valid: false, issues: [{ path: "", code: "type" }] };
   const locale = input.defaultLocale;
   const text = (value: unknown, path: string) => {
-    if (typeof value === "string") { if (!value.trim() || value.length > 20000) fail(path, "text"); return; }
+    if (typeof value === "string") { if (value.length > 20000) fail(path, "text"); return; }
     if (!isRecord(value) || typeof locale !== "string" || !Object.hasOwn(value, locale) || Object.keys(value).length > 100) { fail(path, "text"); return; }
     for (const [key, label] of Object.entries(value)) {
-      if (!key || typeof label !== "string" || !label.trim() || label.length > 20000) fail(path, "text");
+      if (!key || typeof label !== "string" || label.length > 20000) fail(path, "text");
     }
   };
   const id = (value: unknown, path: string) => {
@@ -66,7 +66,7 @@ export function validateDefinition(input: unknown): { valid: boolean; issues: De
   const extras: Record<string, string[]> = {
     text: ["minLength", "maxLength"], textarea: ["minLength", "maxLength"], number: ["min", "max", "integer"],
     select: ["options"], multiselect: ["options", "minItems", "maxItems"], date: ["min", "max"],
-    boolean: [], attachment: ["minItems", "maxItems", "maxBytes", "accept"], notice: [],
+    boolean: [], image: ["minItems", "maxItems", "maxBytes", "output"], attachment: ["minItems", "maxItems", "maxBytes", "accept"], notice: [],
   };
   let total = 0;
   for (const [gi, group] of input.groups.entries()) {
@@ -106,10 +106,29 @@ export function validateDefinition(input: unknown): { valid: boolean; issues: De
         for (const [oi, option] of field.options.entries()) {
           const op = `${fp}.options.${oi}`;
           if (!isRecord(option)) { fail(op); continue; }
-          keys(option, ["id", "label"], op); id(option.id, `${op}.id`); text(option.label, `${op}.label`);
+          keys(option, ["id", "label", "description", "enableWhen"], op); id(option.id, `${op}.id`); text(option.label, `${op}.label`);
+          if (option.enableWhen !== undefined) pending.push({ value: option.enableWhen, path: `${op}.enableWhen`, owner: String(field.id) });
+          if (option.description !== undefined) text(option.description, `${op}.description`);
           if (typeof option.id === "string") { if (options.has(option.id)) fail(`${op}.id`, "duplicate"); options.add(option.id); }
         }
         if (typeof field.minItems === "number" && field.minItems > field.options.length) fail(fp, "range");
+      }
+      if (field.type === "image") {
+        if (field.maxItems !== undefined && (!Number.isSafeInteger(field.maxItems) || (field.maxItems as number) < 1)) fail(`${fp}.maxItems`, "range");
+        if (field.output !== undefined) {
+          const o=field.output;
+          if (!isRecord(o)) fail(`${fp}.output`);
+          else {
+            keys(o,["mode","width","height","maxWidth","maxHeight","maxEdge","maxShortEdge","quality","minimumQuality","shrinkToFit"],`${fp}.output`);
+            if(o.mode!=="fixed" && o.mode!=="free") fail(`${fp}.output.mode`);
+            for(const k of ["width","height","maxWidth","maxHeight","maxEdge","maxShortEdge"]) if(o[k]!==undefined && (!Number.isSafeInteger(o[k]) || (o[k] as number)<1)) fail(`${fp}.output.${k}`,"range");
+            if(o.mode==="fixed" && (o.width===undefined || o.height===undefined)) fail(`${fp}.output`,"dimensions");
+            if(o.mode==="free" && (o.width!==undefined || o.height!==undefined)) fail(`${fp}.output`,"dimensions");
+            for(const k of ["quality","minimumQuality"]) if(o[k]!==undefined && (typeof o[k]!=="number" || !Number.isFinite(o[k]) || (o[k] as number)<=0 || (o[k] as number)>1)) fail(`${fp}.output.${k}`,"range");
+            if(Number(o.minimumQuality??0.82)>Number(o.quality??0.9)) fail(`${fp}.output`,"quality");
+            if(o.shrinkToFit!==undefined && typeof o.shrinkToFit!=="boolean")fail(`${fp}.output.shrinkToFit`);
+          }
+        }
       }
       if (field.type === "attachment" && field.accept !== undefined && (!Array.isArray(field.accept) || field.accept.length > 100 || field.accept.some((mime) => typeof mime !== "string" || !/^[a-z0-9!#$&^_.+-]+\/(?:[a-z0-9!#$&^_.+-]+|\*)$/i.test(mime)))) fail(`${fp}.accept`, "mime");
     }
@@ -136,7 +155,7 @@ export function validateDefinition(input: unknown): { valid: boolean; issues: De
       if (target.type !== "multiselect" || typeof value.value !== "string" || !Array.isArray(target.options) || !target.options.some((option) => isRecord(option) && option.id === value.value)) fail(path, "conditionType");
     } else {
       const type = target.type === "number" ? "number" : target.type === "boolean" ? "boolean" : "string";
-      if (["attachment", "multiselect"].includes(String(target.type)) || typeof value.value !== type || (type === "number" && !Number.isFinite(value.value))) fail(path, "conditionType");
+      if (["attachment", "image", "multiselect"].includes(String(target.type)) || typeof value.value !== type || (type === "number" && !Number.isFinite(value.value))) fail(path, "conditionType");
       if (target.type === "date" && !isDate(value.value)) fail(path, "date");
       if (target.type === "select" && Array.isArray(target.options) && !target.options.some((option) => isRecord(option) && option.id === value.value)) fail(path, "option");
     }
@@ -169,7 +188,7 @@ export function compileDefinition(input: unknown): CompiledForm {
   const visit = (field: Field): void => {
     if (visited.has(field.id)) return;
     visited.add(field.id);
-    [...references(field.visibleWhen), ...references(field.requiredWhen)].forEach((id) => visit(byId.get(id)!));
+    [...references(field.visibleWhen), ...references(field.requiredWhen), ...((field.type === "select" || field.type === "multiselect") ? field.options.flatMap(option => references(option.enableWhen)) : [])].forEach((id) => visit(byId.get(id)!));
     order.push(field);
   };
   fields.forEach(visit);

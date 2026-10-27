@@ -86,3 +86,13 @@ npm publish --registry http://localhost:4873
 遵循语义化版本；`0.x` 阶段也需查看 CHANGELOG，兼容修复增加 patch，破坏性变更增加 minor，并明确迁移步骤。表单 JSON 格式升级使用 `formatVersion`；新增字段类型需要消费方 UI 同步支持。所有网站锁定确切 package 版本，经升级 PR 后重新构建部署。
 
 本地源码仓库独立维护在 `/Users/kasami/form-core`，源码和构建配置自包含，使用 `npm ci` 安装开发依赖。template-next 和派生项目从私有 registry 安装精确版本，不保留源码副本或链接本地 checkout。修改核心后发布新版本，再通过升级 PR 更新网站依赖。
+
+## 选项描述
+
+单选和多选的选项支持 `{ id, label, description? }`。`label` 为标题，`description` 为可选说明，两者均使用 `LocalizedText`，遵循相同语言回退与校验规则。已有只有 `id` 和 `label` 的定义仍兼容。JSON 导出保留描述；CSV 的选项元数据包含本地化描述，答案值与 CSV 列结构不变。
+
+## 选项启用条件
+
+选项可配置 `enableWhen?: Condition`，语法与字段条件一致，缺省启用。`evaluateFields` 的选择题状态包含 `enabledOptions`。`pruneDisabledOptions` 按依赖顺序移除禁用选择；`validateAnswers` 自动执行相同清理，再校验必填及数量限制。非法 ID、重复选项和类型错误仍报错。启用条件受引用与循环检测约束，不能依赖本题。
+
+标题、标签和描述允许空字符串及纯空白字符串，并原样保留；语言映射仍须包含默认语言键，文本长度上限仍为 20000。必填回答的校验不受影响。

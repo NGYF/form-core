@@ -42,7 +42,7 @@ export interface CSVColumn {
   group: string;
   label: string;
   type: string;
-  options?: { id: string; label: string }[];
+  options?: { id: string; label: string; description?: string }[];
 }
 // Quoting alone does not neutralize spreadsheet formulas. Prefix unsafe cells.
 function cell(value: string): string {
@@ -63,7 +63,7 @@ export function exportCSV(records: readonly ExportRecord[], locale?: string): { 
       if (!columns.has(key)) columns.set(key, {
         key, formId: definition.id, revision: definition.revision, fieldId: field.id,
         group: resolveText(group.title, lang, definition.defaultLocale), label: resolveText(field.label, lang, definition.defaultLocale), type: field.type,
-        ...("options" in field ? { options: field.options.map((option) => ({ id: option.id, label: resolveText(option.label, lang, definition.defaultLocale) })) } : {}),
+        ...("options" in field ? { options: field.options.map((option) => ({ id: option.id, label: resolveText(option.label, lang, definition.defaultLocale), ...(option.description !== undefined ? { description: resolveText(option.description, lang, definition.defaultLocale) } : {}) })) } : {}),
       });
     }
   }

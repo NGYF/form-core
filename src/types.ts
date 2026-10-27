@@ -6,7 +6,7 @@ export type Condition =
   | { op: "empty" | "notEmpty"; field: string }
   | { op: "eq" | "neq" | "contains"; field: string; value: Scalar }
   | { op: "gt" | "gte" | "lt" | "lte"; field: string; value: number };
-export interface Option { id: string; label: LocalizedText }
+export interface Option { id: string; label: LocalizedText; description?: LocalizedText; enableWhen?: Condition }
 export interface FieldBase {
   id: string;
   label: LocalizedText;
@@ -15,6 +15,11 @@ export interface FieldBase {
   required?: boolean;
   requiredWhen?: Condition;
 }
+export interface ImageOptions {
+  mode: "fixed" | "free";
+  width?: number; height?: number; maxWidth?: number; maxHeight?: number;
+  maxEdge?: number; maxShortEdge?: number; quality?: number; minimumQuality?: number; shrinkToFit?: boolean;
+}
 export type Field = FieldBase & (
   | { type: "text" | "textarea"; minLength?: number; maxLength?: number }
   | { type: "number"; min?: number; max?: number; integer?: boolean }
@@ -22,6 +27,7 @@ export type Field = FieldBase & (
   | { type: "multiselect"; options: readonly Option[]; minItems?: number; maxItems?: number }
   | { type: "date"; min?: string; max?: string }
   | { type: "boolean" }
+  | { type: "image"; minItems?: number; maxItems?: number; maxBytes?: number; output?: ImageOptions }
   | { type: "attachment"; minItems?: number; maxItems?: number; maxBytes?: number; accept?: readonly string[] }
   | { type: "notice" }
 );
@@ -43,7 +49,7 @@ export interface FormDefinition {
 export interface AttachmentReference { id: string; name: string; size: number; mime: string }
 export type AnswerValue = Scalar | string[] | AttachmentReference[] | null;
 export type Answers = Record<string, AnswerValue>;
-export interface FieldState { visible: boolean; required: boolean }
+export interface FieldState { visible: boolean; required: boolean; enabledOptions?: Record<string, boolean> }
 export type ErrorCode = "required" | "type" | "min" | "max" | "minLength" | "maxLength" | "integer" | "option" | "duplicate" | "date" | "minItems" | "maxItems" | "maxBytes" | "mime";
 export interface AnswerIssue { code: ErrorCode; params?: Record<string, string | number> }
 export interface ValidationResult {
@@ -61,7 +67,7 @@ export interface Submission {
 }
 /** Sites implement authorization, transport, persistence and cleanup. */
 export type UploadAdapter = (file: File, context: {
-  field: Extract<Field, { type: "attachment" }>;
+  field: Extract<Field, { type: "attachment" | "image" }>;
   signal: AbortSignal;
   onProgress?: (progress: { loaded: number; total: number }) => void;
 }) => Promise<AttachmentReference>;

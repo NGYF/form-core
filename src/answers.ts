@@ -19,17 +19,33 @@ function matches(condition: Condition, answers: Readonly<Record<string, unknown>
   }
 }
 /** Calculates in dependency order; values from hidden fields never affect other fields. */
-export function evaluateFields(form: CompiledForm, input: Readonly<Record<string, unknown>>): Record<string, FieldState> {
-  if (!isRecord(input)) throw new TypeError("Answers must be an object");
-  const effective: Record<string, unknown> = Object.create(null);
+function evaluate(form: CompiledForm, input: Readonly<Record<string, unknown>>) {
   const states: Record<string, FieldState> = Object.create(null);
+  const effective: Record<string, unknown> = Object.create(null);
+  const cleaned: Record<string, unknown> = { ...input };
   for (const field of internal(form).order) {
     const visible = !field.visibleWhen || matches(field.visibleWhen, effective);
     const required = visible && field.type !== "notice" && (field.required === true || (field.requiredWhen !== undefined && matches(field.requiredWhen, effective)));
-    states[field.id] = { visible, required };
-    if (visible && field.type !== "notice" && Object.hasOwn(input, field.id)) effective[field.id] = input[field.id];
+    const state: FieldState = { visible, required };
+    let value = input[field.id];
+    if (field.type === "select" || field.type === "multiselect") {
+      const enabled = Object.fromEntries(field.options.map(option => [option.id, !option.enableWhen || matches(option.enableWhen, effective)]));
+      state.enabledOptions = enabled;
+      if (field.type === "select" && typeof value === "string" && enabled[value] === false) value = "";
+      if (field.type === "multiselect" && Array.isArray(value) && value.every(id => typeof id === "string" && Object.hasOwn(enabled, id)) && new Set(value).size === value.length) value = value.filter(id => enabled[id] !== false);
+      if (Object.hasOwn(input, field.id)) cleaned[field.id] = value;
+    }
+    states[field.id] = state;
+    if (visible && field.type !== "notice" && Object.hasOwn(input, field.id)) effective[field.id] = value;
   }
-  return states;
+  return { states, cleaned };
+}
+export function evaluateFields(form: CompiledForm, input: Readonly<Record<string, unknown>>): Record<string, FieldState> {
+  return evaluate(form, input).states;
+}
+/** Remove disabled choices in dependency order without accepting malformed answers. */
+export function pruneDisabledOptions<T extends Readonly<Record<string, unknown>>>(form: CompiledForm, input: T): T {
+  return evaluate(form, input).cleaned as T;
 }
 export function isAttachmentReference(value: unknown): value is AttachmentReference {
   return isRecord(value) && typeof value.id === "string" && !!value.id.trim() && value.id.length <= 2048 &&
@@ -69,6 +85,7 @@ function check(field: Field, value: unknown): AnswerIssue[] {
       if (field.minItems !== undefined && value.length < field.minItems) error("minItems", { limit: field.minItems });
       if (field.maxItems !== undefined && value.length > field.maxItems) error("maxItems", { limit: field.maxItems });
       break;
+    case "image":
     case "attachment":
       if (!Array.isArray(value) || !value.every(isAttachmentReference)) { error("type"); break; }
       if (new Set(value.map((item) => item.id)).size !== value.length) error("duplicate");
@@ -76,7 +93,8 @@ function check(field: Field, value: unknown): AnswerIssue[] {
       if (field.maxItems !== undefined && value.length > field.maxItems) error("maxItems", { limit: field.maxItems });
       for (const item of value) {
         if (field.maxBytes !== undefined && item.size > field.maxBytes) error("maxBytes", { limit: field.maxBytes, attachment: item.id });
-        if (field.accept?.length && !field.accept.some((mime) => mime.toLowerCase() === item.mime.toLowerCase() || (mime.endsWith("/*") && item.mime.toLowerCase().startsWith(mime.slice(0, -1).toLowerCase())))) error("mime", { attachment: item.id });
+        if (field.type === "image" && item.mime !== "image/webp") error("mime", { attachment: item.id });
+        if (field.type === "attachment" && field.accept?.length && !field.accept.some((mime) => mime.toLowerCase() === item.mime.toLowerCase() || (mime.endsWith("/*") && item.mime.toLowerCase().startsWith(mime.slice(0, -1).toLowerCase())))) error("mime", { attachment: item.id });
       }
       break;
     case "notice": break;
@@ -85,21 +103,21 @@ function check(field: Field, value: unknown): AnswerIssue[] {
 }
 /** No string-to-number coercion. null/blank/[] are absent; false and zero are answers. */
 export function validateAnswers(form: CompiledForm, input: Readonly<Record<string, unknown>>): ValidationResult {
-  const states = evaluateFields(form, input);
+  const { states, cleaned } = evaluate(form, input);
   const answers: Answers = Object.create(null), errors: Record<string, AnswerIssue[]> = Object.create(null);
   for (const field of internal(form).fields) {
     if (field.type === "notice" || !states[field.id]!.visible) continue;
-    const value = Object.hasOwn(input, field.id) ? input[field.id] : undefined;
+    const value = Object.hasOwn(cleaned, field.id) ? cleaned[field.id] : undefined;
     if (isEmpty(value)) {
       // An empty container of the wrong type must not bypass validation.
-      const wrongEmptyType = value !== undefined && value !== null && ((Array.isArray(value) && !["attachment", "multiselect"].includes(field.type)) || (typeof value === "string" && !["text", "textarea", "date", "select"].includes(field.type)));
+      const wrongEmptyType = value !== undefined && value !== null && ((Array.isArray(value) && !["attachment", "image", "multiselect"].includes(field.type)) || (typeof value === "string" && !["text", "textarea", "date", "select"].includes(field.type)));
       if (wrongEmptyType) errors[field.id] = [{ code: "type" }];
       else if (states[field.id]!.required) errors[field.id] = [{ code: "required" }];
       continue;
     }
     const issues = check(field, value);
     if (issues.length) { errors[field.id] = issues; continue; }
-    if (field.type === "attachment") answers[field.id] = (value as AttachmentReference[]).map(({ id, name, size, mime }) => ({ id, name, size, mime }));
+    if (field.type === "attachment" || field.type === "image") answers[field.id] = (value as AttachmentReference[]).map(({ id, name, size, mime }) => ({ id, name, size, mime }));
     else answers[field.id] = Array.isArray(value) ? [...value] as string[] : value as AnswerValue;
   }
   return { valid: Object.keys(errors).length === 0, answers, errors, states };
@@ -127,7 +145,7 @@ export function organizeAnswers(form: CompiledForm, input: Readonly<Record<strin
       let displayValue = value === undefined || value === null ? "" : String(value);
       if (field.type === "select") displayValue = field.options.filter((option) => option.id === value).map((option) => text(option.label)).join(", ");
       if (field.type === "multiselect") displayValue = field.options.filter((option) => (value as string[] | undefined)?.includes(option.id)).map((option) => text(option.label)).join(", ");
-      if (field.type === "attachment") displayValue = ((value ?? []) as AttachmentReference[]).map((item) => item.name).join(", ");
+      if (field.type === "attachment" || field.type === "image") displayValue = ((value ?? []) as AttachmentReference[]).map((item) => item.name).join(", ");
       return { id: field.id, type: field.type, label: text(field.label), ...(field.description !== undefined ? { description: text(field.description) } : {}), value, displayValue };
     }),
   }));
