@@ -44,25 +44,26 @@ export function validateDefinition(input: unknown): { valid: boolean; issues: De
   const id = (value: unknown, path: string) => {
     if (typeof value !== "string" || !identifier.test(value) || ["__proto__", "constructor", "prototype"].includes(value)) fail(path, "id");
   };
-  const optionalText = (object: Record<string, unknown>, path: string) => {
+  const optionalContent = (object: Record<string, unknown>, path: string) => {
     if (object.description !== undefined) text(object.description, `${path}.description`);
+    if (object.image !== undefined && (typeof object.image !== "string" || !object.image.trim() || object.image.length > 2048 || Array.from(object.image).some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127))) fail(`${path}.image`, "imageReference");
   };
   const keys = (object: Record<string, unknown>, allowed: readonly string[], path: string) => {
     for (const key of Object.keys(object)) if (!allowed.includes(key)) fail(`${path}.${key}`, "unknownProperty");
   };
-  keys(input, ["formatVersion", "id", "revision", "defaultLocale", "title", "description", "groups"], "");
+  keys(input, ["formatVersion", "id", "revision", "defaultLocale", "title", "description", "image", "groups"], "");
   if (input.formatVersion !== 1) fail("formatVersion", "version");
   id(input.id, "id");
   if (typeof input.revision !== "string" || !input.revision.trim() || input.revision.length > 128) fail("revision");
   if (typeof locale !== "string" || !locale.trim() || locale.length > 64) fail("defaultLocale");
-  text(input.title, "title"); optionalText(input, "");
+  text(input.title, "title"); optionalContent(input, "");
   if (!Array.isArray(input.groups) || input.groups.length > 100) {
     fail("groups", "limit"); return { valid: false, issues };
   }
   const fields = new Map<string, { field: Record<string, unknown>; path: string }>();
   const groups = new Set<string>();
   const pending: { value: unknown; path: string; owner: string }[] = [];
-  const common = ["id", "type", "label", "description", "visibleWhen", "required", "requiredWhen"];
+  const common = ["id", "type", "label", "description", "image", "visibleWhen", "required", "requiredWhen"];
   const extras: Record<string, string[]> = {
     text: ["minLength", "maxLength"], textarea: ["minLength", "maxLength"], number: ["min", "max", "integer"],
     select: ["options"], multiselect: ["options", "minItems", "maxItems"], date: ["min", "max"],
@@ -72,14 +73,14 @@ export function validateDefinition(input: unknown): { valid: boolean; issues: De
   for (const [gi, group] of input.groups.entries()) {
     const path = `groups.${gi}`;
     if (!isRecord(group)) { fail(path); continue; }
-    keys(group, ["id", "title", "description", "fields"], path);
-    id(group.id, `${path}.id`); text(group.title, `${path}.title`); optionalText(group, path);
+    keys(group, ["id", "title", "description", "image", "fields"], path);
+    id(group.id, `${path}.id`); text(group.title, `${path}.title`); optionalContent(group, path);
     if (typeof group.id === "string") { if (groups.has(group.id)) fail(`${path}.id`, "duplicate"); groups.add(group.id); }
     if (!Array.isArray(group.fields) || (total += group.fields.length) > 500) { fail(`${path}.fields`, "limit"); continue; }
     for (const [fi, field] of group.fields.entries()) {
       const fp = `${path}.fields.${fi}`;
       if (!isRecord(field)) { fail(fp); continue; }
-      id(field.id, `${fp}.id`); text(field.label, `${fp}.label`); optionalText(field, fp);
+      id(field.id, `${fp}.id`); text(field.label, `${fp}.label`); optionalContent(field, fp);
       if (typeof field.type !== "string" || !Object.hasOwn(extras, field.type)) { fail(`${fp}.type`); continue; }
       keys(field, [...common, ...extras[field.type]!], fp);
       if (typeof field.id === "string") {
@@ -106,9 +107,9 @@ export function validateDefinition(input: unknown): { valid: boolean; issues: De
         for (const [oi, option] of field.options.entries()) {
           const op = `${fp}.options.${oi}`;
           if (!isRecord(option)) { fail(op); continue; }
-          keys(option, ["id", "label", "description", "enableWhen"], op); id(option.id, `${op}.id`); text(option.label, `${op}.label`);
+          keys(option, ["id", "label", "description", "image", "enableWhen"], op); id(option.id, `${op}.id`); text(option.label, `${op}.label`);
           if (option.enableWhen !== undefined) pending.push({ value: option.enableWhen, path: `${op}.enableWhen`, owner: String(field.id) });
-          if (option.description !== undefined) text(option.description, `${op}.description`);
+          optionalContent(option, op);
           if (typeof option.id === "string") { if (options.has(option.id)) fail(`${op}.id`, "duplicate"); options.add(option.id); }
         }
         if (typeof field.minItems === "number" && field.minItems > field.options.length) fail(fp, "range");

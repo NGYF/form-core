@@ -6,8 +6,10 @@ export type Condition =
   | { op: "empty" | "notEmpty"; field: string }
   | { op: "eq" | "neq" | "contains"; field: string; value: Scalar }
   | { op: "gt" | "gte" | "lt" | "lte"; field: string; value: number };
-export interface Option { id: string; label: LocalizedText; description?: LocalizedText; enableWhen?: Condition }
+/** Opaque content-image references are resolved and persisted by the host. */
+export interface Option { image?: string; id: string; label: LocalizedText; description?: LocalizedText; enableWhen?: Condition }
 export interface FieldBase {
+  image?: string;
   id: string;
   label: LocalizedText;
   description?: LocalizedText;
@@ -32,12 +34,14 @@ export type Field = FieldBase & (
   | { type: "notice" }
 );
 export interface Group {
+  image?: string;
   id: string;
   title: LocalizedText;
   description?: LocalizedText;
   fields: readonly Field[];
 }
 export interface FormDefinition {
+  image?: string;
   formatVersion: 1;
   id: string;
   revision: string;

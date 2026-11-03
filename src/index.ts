@@ -6,4 +6,4 @@ export type { OrganizedField, OrganizedGroup } from "./answers.js";
 export { exportJSON, exportCSV } from "./export.js";
 export type { ExportRecord, CSVColumn } from "./export.js";
 
-export { imageOutput } from "./image.js";
+export { imageOutput, collectDefinitionImages, mapDefinitionImages } from "./image.js";

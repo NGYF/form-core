@@ -96,3 +96,9 @@ npm publish --registry http://localhost:4873
 选项可配置 `enableWhen?: Condition`，语法与字段条件一致，缺省启用。`evaluateFields` 的选择题状态包含 `enabledOptions`。`pruneDisabledOptions` 按依赖顺序移除禁用选择；`validateAnswers` 自动执行相同清理，再校验必填及数量限制。非法 ID、重复选项和类型错误仍报错。启用条件受引用与循环检测约束，不能依赖本题。
 
 标题、标签和描述允许空字符串及纯空白字符串，并原样保留；语言映射仍须包含默认语言键，文本长度上限仍为 20000。必填回答的校验不受影响。
+
+## Content image references (0.3.0)
+
+`FormDefinition`, `Group`, `FieldBase` and `Option` accept an optional `image` string identifying a content image. The reference is opaque: form-core does not interpret storage keys, resolve URLs, upload files or manage retention. References must be nonempty, at most 2048 characters and contain no control characters. `compileDefinition` validates and preserves these references; `collectDefinitionImages(definition)` returns unique references in document order so hosts can validate ownership and manage their resources. Submitted image/file answers remain `AttachmentReference` values and are independent from these author-provided content images.
+
+Visual renderers consume this core definition rather than owning a second persistable presentation document. Editors update it through their normal definition-change callback, so duplication, deletion, history, JSON import/export and content versioning keep image associations together with their nodes. The core owns this content contract; visual packages do not define a parallel persistence model.

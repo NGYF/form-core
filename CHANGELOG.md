@@ -1,4 +1,9 @@
+## 0.3.0
+
+- Form content-image references belong to core definition nodes; renderer/editor consume that definition without a separate Presentation model.
+
 ## 0.2.0
+
 
 Add a dedicated image upload field with output configuration and unlimited optional count; preserve attachment as file upload.
 
