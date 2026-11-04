@@ -72,7 +72,7 @@ export function exportCSV(records: readonly ExportRecord[], locale?: string): { 
   for (const submission of submissions) {
     rows.push([submission.id, submission.formId, submission.revision, submission.submittedAt ?? "", ...description.map((column) => {
       if (column.formId !== submission.formId || column.revision !== submission.revision) return "";
-      const value = submission.answers[column.fieldId];
+      const value = Object.hasOwn(submission.answers, column.fieldId) ? submission.answers[column.fieldId] : undefined;
       return value === undefined || value === null ? "" : Array.isArray(value) ? JSON.stringify(value) : String(value);
     })]);
   }

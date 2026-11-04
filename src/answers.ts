@@ -27,7 +27,7 @@ function evaluate(form: CompiledForm, input: Readonly<Record<string, unknown>>) 
     const visible = !field.visibleWhen || matches(field.visibleWhen, effective);
     const required = visible && field.type !== "notice" && (field.required === true || (field.requiredWhen !== undefined && matches(field.requiredWhen, effective)));
     const state: FieldState = { visible, required };
-    let value = input[field.id];
+    let value = Object.hasOwn(input, field.id) ? input[field.id] : undefined;
     if (field.type === "select" || field.type === "multiselect") {
       const enabled = Object.fromEntries(field.options.map(option => [option.id, !option.enableWhen || matches(option.enableWhen, effective)]));
       state.enabledOptions = enabled;
@@ -141,7 +141,7 @@ export function organizeAnswers(form: CompiledForm, input: Readonly<Record<strin
   return form.definition.groups.map((group) => ({
     id: group.id, title: text(group.title), ...(group.description !== undefined ? { description: text(group.description) } : {}),
     fields: group.fields.filter((field) => states[field.id]!.visible).map((field) => {
-      const value = answers[field.id];
+      const value = Object.hasOwn(answers, field.id) ? answers[field.id] : undefined;
       let displayValue = value === undefined || value === null ? "" : String(value);
       if (field.type === "select") displayValue = field.options.filter((option) => option.id === value).map((option) => text(option.label)).join(", ");
       if (field.type === "multiselect") displayValue = field.options.filter((option) => (value as string[] | undefined)?.includes(option.id)).map((option) => text(option.label)).join(", ");

@@ -10,7 +10,6 @@ export class DefinitionError extends Error {
 export interface CompiledForm { readonly definition: FormDefinition }
 interface InternalForm { fields: readonly Field[]; order: readonly Field[] }
 const compiled = new WeakMap<CompiledForm, InternalForm>();
-const identifier = /^[A-Za-z][A-Za-z0-9_-]{0,127}$/;
 export function isRecord(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
@@ -42,7 +41,7 @@ export function validateDefinition(input: unknown): { valid: boolean; issues: De
     }
   };
   const id = (value: unknown, path: string) => {
-    if (typeof value !== "string" || !identifier.test(value) || ["__proto__", "constructor", "prototype"].includes(value)) fail(path, "id");
+    if (typeof value !== "string" || !value.trim() || Array.from(value).length > 128 || Array.from(value).some(char => char.charCodeAt(0) < 32 || (char.charCodeAt(0) >= 127 && char.charCodeAt(0) <= 159)) || ["__proto__", "constructor", "prototype"].includes(value)) fail(path, "id");
   };
   const optionalContent = (object: Record<string, unknown>, path: string) => {
     if (object.description !== undefined) text(object.description, `${path}.description`);

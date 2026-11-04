@@ -1,3 +1,7 @@
+## 0.3.1
+
+- Treat IDs as stable strings; separate RHF paths and DOM/drag identities from public IDs. Preserve existing definitions and answer keys.
+
 ## 0.3.0
 
 - Form content-image references belong to core definition nodes; renderer/editor consume that definition without a separate Presentation model.

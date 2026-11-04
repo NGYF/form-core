@@ -43,7 +43,7 @@ if (result.valid) {
 ## 定义和答案
 
 - `validateDefinition(unknown)` 返回路径与错误码；`compileDefinition(unknown)` 出错时抛出 `DefinitionError`，成功时创建不可变副本。`CompiledForm` 必须由编译接口创建，不能从 JSON 直接反序列化。
-- 定义顺序由 `groups` 和 `fields` 数组决定。支持 `text`、`textarea`、`number`、`select`、`multiselect`、`date`、`boolean`、`attachment`、`notice`。字段 ID 在整个表单中唯一，选项 ID 在字段内唯一。ID 使用字母开头的字母、数字、下划线或连字符。
+- 定义顺序由 `groups` 和 `fields` 数组决定。支持 `text`、`textarea`、`number`、`select`、`multiselect`、`date`、`boolean`、`attachment`、`notice`。字段 ID 在整个表单中唯一，选项 ID 在字段内唯一。ID 是 1～128 个 Unicode 码点的稳定普通字符串，支持 UUID、数字、中文及标点；按原字符串精确匹配，不裁剪或归一化。拒绝纯空白、C0/C1 控制字符及 `__proto__`、`constructor`、`prototype`。ID 不是 JavaScript 标识符、DOM ID 或表单路径。
 - 文本可以是普通字符串或语言映射；映射必须包含 `defaultLocale`。`resolveText` 精确匹配所选语言，否则回退默认语言。所有文本都是纯文本，界面应转义显示。
 - 定义未知属性会被拒绝，扩展格式应先升级核心；限制为 100 个分组、500 个字段、每字段 500 个选项，以及 16 层/5000 个条件节点。
 - 答案为字段 ID 到 JSON 值的映射。数字必须是有限数字，不自动转换数字字符串；多选保存选项 ID 数组；日期保存真实的 `YYYY-MM-DD` 日历日期；文本保留原始内容。
