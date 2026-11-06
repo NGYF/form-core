@@ -1,4 +1,5 @@
-import type { Condition, Field, FormDefinition, LocalizedText } from "./types.js";
+import { isField } from "./types.js";
+import type { Condition, Field, FormItem, FormDefinition, LocalizedText } from "./types.js";
 
 export interface DefinitionIssue { path: string; code: string }
 export class DefinitionError extends Error {
@@ -7,9 +8,10 @@ export class DefinitionError extends Error {
     this.name = "DefinitionError";
   }
 }
-export interface CompiledForm { readonly definition: FormDefinition }
+export interface CompiledForm<T extends FormItem = Field> { readonly definition: FormDefinition<T> }
+export type AnyCompiledForm = CompiledForm<FormItem>;
 interface InternalForm { fields: readonly Field[]; order: readonly Field[] }
-const compiled = new WeakMap<CompiledForm, InternalForm>();
+const compiled = new WeakMap<AnyCompiledForm, InternalForm>();
 export function isRecord(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
@@ -80,11 +82,26 @@ export function validateDefinition(input: unknown): { valid: boolean; issues: De
       const fp = `${path}.fields.${fi}`;
       if (!isRecord(field)) { fail(fp); continue; }
       id(field.id, `${fp}.id`); text(field.label, `${fp}.label`); optionalContent(field, fp);
-      if (typeof field.type !== "string" || !Object.hasOwn(extras, field.type)) { fail(`${fp}.type`); continue; }
-      keys(field, [...common, ...extras[field.type]!], fp);
+      if (typeof field.type !== "string" || !field.type.trim() || field.type.length > 128) { fail(`${fp}.type`); continue; }
+      const builtin = Object.hasOwn(extras,field.type);
+      if (builtin) keys(field, [...common, ...extras[field.type]!], fp);
       if (typeof field.id === "string") {
         if (fields.has(field.id)) fail(`${fp}.id`, "duplicate");
         fields.set(field.id, { field, path: fp });
+      }
+      if (!builtin) {
+        let count=0, characters=0;
+        const data=(value:unknown,depth:number):boolean=>{
+          if(++count>100000 || depth>24)return false;
+          if(value===null || typeof value === "boolean")return true;
+          if(typeof value === "string"){characters+=value.length;return characters<=1000000;}
+          if(typeof value === "number")return Number.isFinite(value);
+          if(Array.isArray(value))return value.every(v=>data(v,depth+1));
+          return isRecord(value) && Object.values(value).every(v=>v === undefined || data(v,depth+1));
+        };
+        if(!data(field,0))fail(fp,"data");
+        if(field.visibleWhen!==undefined)pending.push({value:field.visibleWhen,path:`${fp}.visibleWhen`,owner:String(field.id)});
+        continue;
       }
       for (const name of ["required", "integer"]) if (field[name] !== undefined && typeof field[name] !== "boolean") fail(`${fp}.${name}`);
       if (field.type === "notice" && (field.required !== undefined || field.requiredWhen !== undefined)) fail(fp, "noticeRequired");
@@ -146,7 +163,7 @@ export function validateDefinition(input: unknown): { valid: boolean; issues: De
     if (!["empty", "notEmpty", "eq", "neq", "contains", "gt", "gte", "lt", "lte"].includes(String(value.op))) { fail(path, "condition"); return; }
     keys(value, value.op === "empty" || value.op === "notEmpty" ? ["op", "field"] : ["op", "field", "value"], path);
     const target = typeof value.field === "string" ? fields.get(value.field)?.field : undefined;
-    if (!target || target.type === "notice") { fail(`${path}.field`, "reference"); return; }
+    if (!target || target.type === "notice" || !Object.hasOwn(extras,String(target.type))) { fail(`${path}.field`, "reference"); return; }
     const deps = dependencies.get(owner) ?? new Set<string>(); deps.add(String(value.field)); dependencies.set(owner, deps);
     if (value.op === "empty" || value.op === "notEmpty") return;
     if (["gt", "gte", "lt", "lte"].includes(String(value.op))) {
@@ -178,11 +195,12 @@ function freeze<T>(value: T): T {
   if (value !== null && typeof value === "object") { Object.values(value).forEach(freeze); Object.freeze(value); }
   return value;
 }
-export function compileDefinition(input: unknown): CompiledForm {
+export function compileDefinition<T extends FormItem = Field>(input: unknown): CompiledForm<T> {
   const result = validateDefinition(input);
   if (!result.valid) throw new DefinitionError(result.issues);
-  const definition = freeze(JSON.parse(JSON.stringify(input)) as FormDefinition);
-  const fields = definition.groups.flatMap((group) => group.fields);
+  const definition = freeze(JSON.parse(JSON.stringify(input)) as FormDefinition<T>);
+  const items: readonly FormItem[] = definition.groups.flatMap((group) => group.fields);
+  const fields = items.filter(isField);
   const byId = new Map(fields.map((field) => [field.id, field]));
   const order: Field[] = [], visited = new Set<string>();
   const visit = (field: Field): void => {
@@ -194,7 +212,7 @@ export function compileDefinition(input: unknown): CompiledForm {
   fields.forEach(visit);
   const form = Object.freeze({ definition }); compiled.set(form, { fields, order }); return form;
 }
-export function internal(form: CompiledForm): InternalForm {
+export function internal(form: AnyCompiledForm): InternalForm {
   const value = compiled.get(form);
   if (!value) throw new TypeError("Use compileDefinition to create a compiled form");
   return value;

@@ -1,3 +1,11 @@
+## 0.5.3
+
+FormDefinition, Group and CompiledForm retain builtin Field typing by default. Project display items are explicit through the generic FormItem parameter or AnyFormDefinition/AnyCompiledForm aliases; builtin callers keep discriminant narrowing. No JSON shape or stored-answer migration is introduced.
+
+## 0.5.2
+
+- Image answers accept image MIME types rather than requiring WebP. Hosts remain responsible for validating file content and their chosen output format. Optional maxBytes remains unlimited when omitted.
+
 ## 0.3.1
 
 - Treat IDs as stable strings; separate RHF paths and DOM/drag identities from public IDs. Preserve existing definitions and answer keys.
@@ -32,3 +40,11 @@ Add a dedicated image upload field with output configuration and unlimited optio
 - Initial headless JSON form definitions, compilation, conditional fields and answer validation.
 - Portable attachment contracts, localized answer organization and version-aware JSON/CSV exports.
 - No runtime dependencies or framework/database integration.
+
+## 0.5.0 - Open item types
+
+JSON items carry their own `type` and data; no type registration or extension wrapper is required. Core validates shared structure and known types, and preserves unknown JSON items as display-only data. Hosts validate their custom configuration. Unknown types do not produce answers, required errors, condition sources or CSV columns. `isField` and `isFieldType` narrow built-in items. All items share `group.fields` ordering and ID uniqueness.
+
+## 0.5.1
+
+Allow omitted optional properties in programmatically edited custom items; emitted definitions remain plain JSON.

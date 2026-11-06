@@ -33,14 +33,14 @@ export type Field = FieldBase & (
   | { type: "attachment"; minItems?: number; maxItems?: number; maxBytes?: number; accept?: readonly string[] }
   | { type: "notice" }
 );
-export interface Group {
+export interface Group<T extends FormItem = Field> {
   image?: string;
   id: string;
   title: LocalizedText;
   description?: LocalizedText;
-  fields: readonly Field[];
+  fields: readonly T[];
 }
-export interface FormDefinition {
+export interface FormDefinition<T extends FormItem = Field> {
   image?: string;
   formatVersion: 1;
   id: string;
@@ -48,7 +48,7 @@ export interface FormDefinition {
   defaultLocale: string;
   title: LocalizedText;
   description?: LocalizedText;
-  groups: readonly Group[];
+  groups: readonly Group<T>[];
 }
 export interface AttachmentReference { id: string; name: string; size: number; mime: string }
 export type AnswerValue = Scalar | string[] | AttachmentReference[] | null;
@@ -75,3 +75,13 @@ export type UploadAdapter = (file: File, context: {
   signal: AbortSignal;
   onProgress?: (progress: { loaded: number; total: number }) => void;
 }) => Promise<AttachmentReference>;
+
+/** Open data: unknown item types are preserved as display-only items. */
+export interface CustomItem extends FieldBase { type: string; config?: unknown }
+export type FormItem = Field | CustomItem;
+const builtinTypes = new Set(["text","textarea","number","select","multiselect","date","boolean","image","attachment","notice"]);
+export function isField(item: FormItem): item is Field { return builtinTypes.has(item.type); }
+export function isFieldType<T extends Field["type"]>(item: FormItem, ...types: readonly T[]): item is Field & {type:T} { return isField(item) && (types as readonly string[]).includes(item.type); }
+
+/** Opt in to custom display items without changing builtin field narrowing. */
+export type AnyFormDefinition = FormDefinition<FormItem>;

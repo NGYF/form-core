@@ -1,3 +1,4 @@
+import { isField } from "./types.js";
 import type { Field } from "./types.js";
 export function imageOutput(field: Extract<Field,{type:"image"}>) {
   const o=field.output??{mode:"fixed" as const,width:1600,height:1000};
@@ -6,7 +7,7 @@ export function imageOutput(field: Extract<Field,{type:"image"}>) {
 }
 
 /** Content references only: no URLs, upload, storage or resource-lifetime policy. */
-export function collectDefinitionImages(definition: import("./types.js").FormDefinition): string[] {
+export function collectDefinitionImages(definition: import("./types.js").AnyFormDefinition): string[] {
   const references = new Set<string>();
   const add = (node: { image?: string }) => { if (node.image) references.add(node.image); };
   add(definition);
@@ -14,7 +15,7 @@ export function collectDefinitionImages(definition: import("./types.js").FormDef
     add(group);
     for (const field of group.fields) {
       add(field);
-      if (field.type === "select" || field.type === "multiselect")
+      if (isField(field) && (field.type === "select" || field.type === "multiselect"))
         for (const option of field.options) add(option);
     }
   }
@@ -22,10 +23,10 @@ export function collectDefinitionImages(definition: import("./types.js").FormDef
 }
 
 /** Rewrite opaque references without introducing a second document or visual model. */
-export function mapDefinitionImages(
-  definition: import("./types.js").FormDefinition,
+export function mapDefinitionImages<T extends import("./types.js").FormItem = Field>(
+  definition: import("./types.js").FormDefinition<T>,
   map: (reference: string) => string,
-): import("./types.js").FormDefinition {
+): import("./types.js").FormDefinition<T> {
   const mapped = <T extends { image?: string }>(node: T): T =>
     node.image === undefined ? { ...node } : { ...node, image: map(node.image) };
   return {
@@ -33,7 +34,7 @@ export function mapDefinitionImages(
     groups: definition.groups.map((group) => ({
       ...mapped(group),
       fields: group.fields.map((field) =>
-        field.type === "select" || field.type === "multiselect"
+        isField(field) && (field.type === "select" || field.type === "multiselect")
           ? { ...mapped(field), options: field.options.map(mapped) }
           : mapped(field),
       ),

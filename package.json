@@ -1,6 +1,6 @@
 {
   "name": "@kasami/form-core",
-  "version": "0.3.1",
+  "version": "0.5.3",
   "description": "Portable, headless JSON forms, validation and exports",
   "type": "module",
   "license": "MIT",

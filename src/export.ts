@@ -1,6 +1,7 @@
+import { isField } from "./types.js";
 import { normalizeAnswers } from "./answers.js";
-import { internal, resolveText, type CompiledForm } from "./definition.js";
-import type { FormDefinition, Submission } from "./types.js";
+import { internal, resolveText, type AnyCompiledForm as CompiledForm } from "./definition.js";
+import type { AnyFormDefinition as FormDefinition, Submission } from "./types.js";
 
 export interface ExportRecord { form: CompiledForm; submission: Submission }
 function stableJSON(value: unknown): string {
@@ -58,7 +59,7 @@ export function exportCSV(records: readonly ExportRecord[], locale?: string): { 
   for (const { form } of records) {
     const definition = form.definition, lang = locale ?? definition.defaultLocale;
     for (const group of definition.groups) for (const field of group.fields) {
-      if (field.type === "notice") continue;
+      if (!isField(field) || field.type === "notice") continue;
       const key = `answer:${JSON.stringify([definition.id, definition.revision, field.id])}`;
       if (!columns.has(key)) columns.set(key, {
         key, formId: definition.id, revision: definition.revision, fieldId: field.id,

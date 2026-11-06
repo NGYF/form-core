@@ -1,4 +1,5 @@
-import { internal, isDate, isEmpty, isRecord, resolveText, type CompiledForm } from "./definition.js";
+import { isField } from "./types.js";
+import { internal, isDate, isEmpty, isRecord, resolveText, type AnyCompiledForm as CompiledForm } from "./definition.js";
 import type { AnswerIssue, Answers, AnswerValue, AttachmentReference, Condition, Field, FieldState, ValidationResult } from "./types.js";
 
 function matches(condition: Condition, answers: Readonly<Record<string, unknown>>): boolean {
@@ -37,6 +38,10 @@ function evaluate(form: CompiledForm, input: Readonly<Record<string, unknown>>) 
     }
     states[field.id] = state;
     if (visible && field.type !== "notice" && Object.hasOwn(input, field.id)) effective[field.id] = value;
+  }
+  for(const item of form.definition.groups.flatMap(g=>g.fields)) if(!isField(item)) {
+    states[item.id]={visible:!item.visibleWhen || matches(item.visibleWhen,effective),required:false};
+    delete cleaned[item.id];
   }
   return { states, cleaned };
 }
@@ -93,7 +98,7 @@ function check(field: Field, value: unknown): AnswerIssue[] {
       if (field.maxItems !== undefined && value.length > field.maxItems) error("maxItems", { limit: field.maxItems });
       for (const item of value) {
         if (field.maxBytes !== undefined && item.size > field.maxBytes) error("maxBytes", { limit: field.maxBytes, attachment: item.id });
-        if (field.type === "image" && item.mime !== "image/webp") error("mime", { attachment: item.id });
+        if (field.type === "image" && !/^image\/[a-z0-9!#$&^_.+-]+$/i.test(item.mime)) error("mime", { attachment: item.id });
         if (field.type === "attachment" && field.accept?.length && !field.accept.some((mime) => mime.toLowerCase() === item.mime.toLowerCase() || (mime.endsWith("/*") && item.mime.toLowerCase().startsWith(mime.slice(0, -1).toLowerCase())))) error("mime", { attachment: item.id });
       }
       break;
@@ -140,7 +145,7 @@ export function organizeAnswers(form: CompiledForm, input: Readonly<Record<strin
   const text = (value: Parameters<typeof resolveText>[0]) => resolveText(value, locale, form.definition.defaultLocale);
   return form.definition.groups.map((group) => ({
     id: group.id, title: text(group.title), ...(group.description !== undefined ? { description: text(group.description) } : {}),
-    fields: group.fields.filter((field) => states[field.id]!.visible).map((field) => {
+    fields: group.fields.filter(isField).filter((field) => states[field.id]!.visible).map((field) => {
       const value = Object.hasOwn(answers, field.id) ? answers[field.id] : undefined;
       let displayValue = value === undefined || value === null ? "" : String(value);
       if (field.type === "select") displayValue = field.options.filter((option) => option.id === value).map((option) => text(option.label)).join(", ");

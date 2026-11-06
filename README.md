@@ -102,3 +102,15 @@ npm publish --registry http://localhost:4873
 `FormDefinition`, `Group`, `FieldBase` and `Option` accept an optional `image` string identifying a content image. The reference is opaque: form-core does not interpret storage keys, resolve URLs, upload files or manage retention. References must be nonempty, at most 2048 characters and contain no control characters. `compileDefinition` validates and preserves these references; `collectDefinitionImages(definition)` returns unique references in document order so hosts can validate ownership and manage their resources. Submitted image/file answers remain `AttachmentReference` values and are independent from these author-provided content images.
 
 Visual renderers consume this core definition rather than owning a second persistable presentation document. Editors update it through their normal definition-change callback, so duplication, deletion, history, JSON import/export and content versioning keep image associations together with their nodes. The core owns this content contract; visual packages do not define a parallel persistence model.
+
+## 0.5.0 - Open item types
+
+JSON items carry their own `type` and data; no type registration or extension wrapper is required. Core validates shared structure and known types, and preserves unknown JSON items as display-only data. Hosts validate their custom configuration. Unknown types do not produce answers, required errors, condition sources or CSV columns. `isField` and `isFieldType` narrow built-in items. All items share `group.fields` ordering and ID uniqueness.
+
+
+## Image processing extension
+
+Image answers accept image MIME types rather than requiring WebP. Hosts remain responsible for validating file content and their chosen output format. Optional maxBytes remains unlimited when omitted.
+
+
+FormDefinition, Group and CompiledForm retain builtin Field typing by default. Project display items are explicit through the generic FormItem parameter or AnyFormDefinition/AnyCompiledForm aliases; builtin callers keep discriminant narrowing. No JSON shape or stored-answer migration is introduced.
